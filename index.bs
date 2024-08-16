@@ -1,0 +1,334 @@
+<h1>Federated Credentials</h1>
+<pre class="metadata">
+Status: UD
+ED: https://w3c.github.io/webappsec-credential-management/
+Previous Version: https://www.w3.org/TR/2016/WD-credential-management-1-20160425/
+Shortname: federated-credentials
+Level: 1
+Group: webappsec
+Abstract:
+  This specification describes a Federated Credential interface.
+Indent: 2
+Version History: https://github.com/w3c/webappsec-credential-management/commits/main/index.src.html
+Issue Tracking: GitHub https://github.com/w3c/webappsec-credential-management/issues
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/w3c/webappsec-credential-management/issues/new">File an issue</a> (<a href="https://github.com/w3c/webappsec-credential-management/issues">open issues</a>)
+Markup Shorthands: css off, markdown on
+</pre>
+
+<pre class="anchors">
+spec: ECMA262; urlPrefix: https://tc39.github.io/ecma262/
+  type: dfn
+    text: JavaScript realm; url: sec-code-realms
+    text: internal method; url: sec-ordinary-object-internal-methods-and-internal-slots
+spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/
+  urlPrefix: forms.html
+    type: element-attr
+      text: autocomplete; for: input; url: #attr-fe-autocomplete
+      text: name; for: input; url: #attr-fe-name
+      text: enctype; for: form; url: #concept-fs-enctype
+    type: attr-value
+      for: autocomplete
+        text: current-password; url: attr-fe-autocomplete-current-password
+        text: new-password; url: attr-fe-autocomplete-new-password
+        text: nickname; url: attr-fe-autocomplete-nickname
+        text: name; url: attr-fe-autocomplete-name
+        text: photo; url: attr-fe-autocomplete-photo
+        text: username; url: attr-fe-autocomplete-username
+  urlPrefix: origin.html
+    type: dfn
+      text: origin; for: html-origin-def; url: concept-origin
+  urlPrefix: browsers.html
+    type: dfn
+      text: browsing context; for: document; url: concept-document-bc
+  urlPrefix: webappapis.html
+    type: dfn
+      text: DOM manipulation task source; url: dom-manipulation-task-source
+spec: XHR; urlPrefix: https://xhr.spec.whatwg.org/
+  type: dfn
+    text: entry; url: concept-formdata-entry
+    text: entries; for: FormData; url: concept-formdata-entry
+    text: name; for: entry; url: concept-formdata-entry-name
+    text: value; for: entry; url: concept-formdata-entry-value
+    text: type; for: entry; url: concept-formdata-entry-type
+  type: interface
+    text: FormData; url: interface-formdata
+spec: PSL; urlPrefix: https://publicsuffix.org/list/
+  type: dfn
+    text: registerable domain; url: #
+    text: public suffix; url: #
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: dfn
+    text: http-network-or-cache fetch; url: http-network-or-cache-fetch
+spec: promises-guide-1; urlPrefix: https://www.w3.org/2001/tag/doc/promises-guide
+  type: dfn
+    text: promise-calling; url: should-promise-call
+spec: web-otp; urlPrefix: https://wicg.github.io/web-otp
+  type: interface
+    text: OTPCredential; url: otpcredential
+</pre>
+
+<pre class="link-defaults">
+spec:html; type:dfn; for:html-origin-def; text:origin
+spec:html; type:dfn; for:environment settings object; text:global object
+spec:fetch; type:dfn; for:/; text:request
+spec:fetch; type:dictionary; for:/; text:RequestInit
+spec:infra; type:dfn; for:/; text:set
+spec:infra; type:dfn; for:struct; text:item
+spec:webidl; type:idl; for:/; text:Function
+spec:webidl; type:dfn; text:identifier
+spec:webidl; type:interface; text:Promise
+spec:webidl; type:dfn; text:resolve
+spec:credential-management-1; type:dfn; text:same-origin with its ancestors
+
+<!-- These need to be exported -->
+spec:html; type:dfn; text:submittable element
+spec:html; type:dfn; text:form owner
+spec:html; type:dfn; text:autofill detail tokens
+spec:url; type:dfn; text:urlencoded byte serializer
+</pre>
+<pre class='ignored-specs'>
+spec:css-syntax-3;
+</pre>
+
+<!--
+████████ ████████ ████████  ████████ ████████     ███    ████████ ████  ███████  ██    ██  ██████ 
+██       ██       ██     ██ ██       ██     ██   ██ ██      ██     ██  ██     ██ ███   ██ ██    ██
+██       ██       ██     ██ ██       ██     ██  ██   ██     ██     ██  ██     ██ ████  ██ ██      
+██████   ██████   ██     ██ ██████   ████████  ██     ██    ██     ██  ██     ██ ██ ██ ██  ██████ 
+██       ██       ██     ██ ██       ██   ██   █████████    ██     ██  ██     ██ ██  ████       ██
+██       ██       ██     ██ ██       ██    ██  ██     ██    ██     ██  ██     ██ ██   ███ ██    ██
+██       ████████ ████████  ████████ ██     ██ ██     ██    ██    ████  ███████  ██    ██  ██████ 
+-->
+<section>
+  # Federated Credentials # {#federated}
+
+  ## The `FederatedCredential` Interface ## {#federatedcredential-interface}
+
+  <pre class="idl">
+    [Exposed=Window,
+     SecureContext]
+    interface FederatedCredential : Credential {
+      constructor(FederatedCredentialInit data);
+      readonly attribute USVString provider;
+      readonly attribute DOMString? protocol;
+    };
+    FederatedCredential includes CredentialUserData;
+
+    dictionary FederatedCredentialRequestOptions {
+      sequence&lt;USVString&gt; providers;
+      sequence&lt;DOMString&gt; protocols;
+    };
+
+    partial dictionary CredentialRequestOptions {
+      FederatedCredentialRequestOptions federated;
+    };
+  </pre>
+  <div dfn-for="FederatedCredential">
+    :   <dfn attribute>provider</dfn>
+    ::  The credential's federated identity provider. See [[#provider-identification]] for
+        details regarding valid formats.
+
+    :   <dfn attribute>protocol</dfn>
+    ::  The credential's federated identity provider's protocol (e.g. "`openidconnect`"). If the
+        value is `null`, then the protocol can be inferred from the
+        {{FederatedCredential/provider}}.
+
+    :   {{Credential/[[type]]}}
+    ::  The {{FederatedCredential}} [=interface object=] has an internal slot named `[[type]]` whose
+        value is "<dfn const>`federated`</dfn>".
+
+    :   {{Credential/[[discovery]]}}
+    ::  The {{FederatedCredential}} [=interface object=] has an internal slot named `[[discovery]]`
+        whose value is "{{Credential/[[discovery]]/credential store}}".
+
+    :   <dfn constructor>FederatedCredential(data)</dfn>
+    ::  This constructor accepts a {{FederatedCredentialInit}} (|data|), and runs the following steps:
+
+        1.  Let |r| be the result of executing <a abstract-op>Create a `FederatedCredential` from
+            `FederatedCredentialInit`</a> on |data|. If that threw an [=exception=], rethrow that
+            exception.
+
+        2.  Return |r|.
+  </div>
+
+  {{FederatedCredential}} objects can be created by passing a {{FederatedCredentialInit}} dictionary
+  into {{CredentialsContainer/create()|navigator.credentials.create()}}.
+
+  <pre class="idl">
+    dictionary FederatedCredentialInit : CredentialData {
+      USVString name;
+      USVString iconURL;
+      required USVString origin;
+      required USVString provider;
+      DOMString protocol;
+    };
+
+    partial dictionary CredentialCreationOptions {
+      FederatedCredentialInit federated;
+    };
+  </pre>
+
+  {{FederatedCredential}} objects are [=Credential/origin bound=].
+
+  {{FederatedCredential}}'s [=interface object=] inherits {{Credential}}'s implementation of
+  {{Credential/[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}},
+  and defines its own implementation of
+  {{FederatedCredential/[[CollectFromCredentialStore]](origin, options, sameOriginWithAncestors)}},
+  {{FederatedCredential/[[Create]](origin, options, sameOriginWithAncestors)}}, and
+  {{FederatedCredential/[[Store]](credential, sameOriginWithAncestors)}}.
+
+  Note: If, in the future, we teach the user agent to obtain authentication tokens on a user's
+  behalf, we could do so by building an implementation of
+  `[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)`.
+
+  ### Identifying Providers ### {#provider-identification}
+
+  Every site should use the same identifier when referring to a specific federated identity
+  provider. For example,
+  <a href="https://developers.facebook.com/docs/facebook-login/v2.0">Facebook Login</a>
+  shouldn't be referred to as "Facebook" and "Facebook Login" and "FB" and "FBL" and "Facebook.com"
+  and so on. It should have a canonical identifier which everyone can make use of, as consistent
+  identification makes it possible for user agents to be helpful.
+
+  For consistency, federations passed into the APIs defined in this document (e.g.
+  {{FederatedCredentialRequestOptions}}'s {{FederatedCredentialRequestOptions/providers}} array, or
+  {{FederatedCredential}}'s {{FederatedCredential/provider}} property) MUST be identified by the
+  <a lt="ASCII serialization of an origin">ASCII serialization</a> of the origin the provider uses
+  for sign in. That is, Facebook would be represented by `https://www.facebook.com` and Google by
+  `https://accounts.google.com`.
+
+  This serialization of an [=origin=] does _not_ include a trailing U+002F SOLIDUS ("`/`"), but
+  user agents SHOULD accept them silently: `https://accounts.google.com/` is clearly
+  intended to be the same as `https://accounts.google.com`.
+
+  ## Algorithms ## {#federatedcredential-algorithms}
+
+  <h4 algorithm id="collectfromcredentialstore-federatedcredential">
+    `FederatedCredential`'s `[[CollectFromCredentialStore]](origin, options, sameOriginWithAncestors)`
+  </h4>
+
+  <dfn for="FederatedCredential" method>\[[CollectFromCredentialStore]](origin, options, sameOriginWithAncestors)</dfn>
+  is called with an [=origin=] (|origin|), a {{CredentialRequestOptions}} (|options|),
+  and a boolean which is `true` if and only if the calling context is [=same-origin with its ancestors=] (|sameOriginWithAncestors|).
+  The algorithm returns a set of {{Credential}} objects from
+  the [=credential store=]. If no matching {{Credential}} objects are available, the returned set
+  will be empty.
+
+  <ol class="algorithm">
+    1.  Assert: |options|["{{CredentialRequestOptions/federated}}"] [=map/exists=].
+
+    2.  If |sameOriginWithAncestors| is `false`, throw a "{{NotAllowedError}}" {{DOMException}}.
+
+        Note: This restriction aims to address the concern raised in [[CREDENTIAL-MANAGEMENT#security-origin-confusion]].
+
+    3.  Return the empty set if |options|["{{CredentialRequestOptions/federated}}"] is not `true`.
+
+    4.  Return the result of <a abstract-op lt="Retrieve a list of credentials">retrieving</a>
+        credentials from the [=credential store=] that match the following filter:
+
+        1.  The credential is a {{FederatedCredential}}
+        2.  The credential's {{Credential/[[origin]]}} is the [=same origin=] as |origin|.
+        3.  If |options|["{{CredentialRequestOptions/federated}}"]["{{FederatedCredentialRequestOptions/providers}}"]
+            [=map/exists=], its value [=list/contains=] the credentials's {{FederatedCredential/provider}}.
+        4.  If |options|["{{CredentialRequestOptions/federated}}"]["{{FederatedCredentialRequestOptions/protocols}}"]
+            [=map/exists=], its value [=list/contains=] the credentials's {{FederatedCredential/protocol}}.
+  </ol>
+
+  <h4 algorithm id="create-federatedcredential">
+    `FederatedCredential`'s `[[Create]](origin, options, sameOriginWithAncestors)`
+  </h4>
+
+  <dfn for="FederatedCredential" method>\[[Create]](origin, options, sameOriginWithAncestors)</dfn>
+  is called with an [=origin=] (|origin|), a
+  {{CredentialCreationOptions}} (|options|), and a boolean which is `true` if and only if the
+  calling context is [=same-origin with its ancestors=] (|sameOriginWithAncestors|).
+  The algorithm returns a {{FederatedCredential}} if one can be created,
+  `null` otherwise, or throws an [=exception=] in exceptional circumstances:
+
+  <ol class="algorithm">
+    1.  Assert: |options|["{{CredentialCreationOptions/federated}}"] [=map/exists=], and
+        |sameOriginWithAncestors| is unused.
+
+    2.  Set |options|["{{CredentialCreationOptions/federated}}"]'s {{FederatedCredentialInit/origin}}
+        member's value to |origin|'s value.
+
+    3.  Return the result of executing <a abstract-op>Create a `FederatedCredential` from
+        `FederatedCredentialInit`</a> given |options|["{{CredentialCreationOptions/federated}}"].
+        If that threw an [=exception=], then rethrow that exception.
+  </ol>
+
+  <h4 algorithm id="store-federatedcredential">
+    `FederatedCredential`'s `[[Store]](credential, sameOriginWithAncestors)`
+  </h4>
+
+  <dfn for="FederatedCredential" method>\[[Store]](credential, sameOriginWithAncestors)</dfn> is
+  called with a {{FederatedCredential}} (|credential|), and a boolean which is `true` if and only if the
+  calling context is [=same-origin with its ancestors=] (|sameOriginWithAncestors|). The algorithm
+  returns `undefined` once |credential| is persisted to the [=credential store=].
+
+  The algorithm will return a `NotAllowedError` if |sameOriginWithAncestors| is not `true`.
+
+  <ol class="algorithm">
+    1.  Throw a "{{NotAllowedError}}" {{DOMException}} without altering the user agent's
+        [=credential store=] if <var ignore>sameOriginWithAncestors</var> is `false`.
+
+        Note: This restriction aims to address the concern raised in [[CREDENTIAL-MANAGEMENT#security-origin-confusion]].
+
+    2.  If the user agent's [=credential store=] contains a {{FederatedCredential}} whose
+        {{Credential/id}} attribute is |credential|'s {{Credential/id}} and whose {{[[origin]]}}
+        slot is the [=same origin=] as |credential|'s {{Credential/[[origin]]}}, and
+        whose {{FederatedCredential/provider}} is |credential|'s
+        {{FederatedCredential/provider}}, then return.
+
+    3.  If the user grants permission to store credentials (as discussed when defining
+        [=user mediation=]), then store a {{FederatedCredential}} in the [=credential store=] with
+        the following properties:
+        
+        :   {{Credential/id}}
+        ::  |credential|'s {{Credential/id}}
+        :   {{CredentialUserData/name}},
+        ::  |credential|'s {{CredentialUserData/name}}
+        :   {{CredentialUserData/iconURL}}
+        ::  |credential|'s {{CredentialUserData/iconURL}}
+        :   {{Credential/[[origin]]}}
+        ::  |credential|'s {{Credential/[[origin]]}}
+        :   {{FederatedCredential/provider}}
+        ::  |credential|'s {{FederatedCredential/provider}}
+        :   {{FederatedCredential/protocol}}
+        ::  |credential|'s {{FederatedCredential/protocol}}
+  </ol>
+
+  <h4 algorithm id="construct-federatedcredential-data">
+    Create a `FederatedCredential` from `FederatedCredentialInit`
+  </h4>
+
+
+  To <dfn abstract-op>Create a `FederatedCredential` from `FederatedCredentialInit`</dfn>, given a
+  {{FederatedCredentialInit}} (|init|), run these steps.
+
+  <ol class="algorithm">
+    1.  Let |c| be a new {{FederatedCredential}} object.
+    
+    2.  If any of the following are the empty string, throw a {{TypeError}} [=exception=]:
+
+        *   |init|.{{CredentialData/id}}'s value
+        *   |init|.{{FederatedCredentialInit/provider}}'s value
+
+    3.  Set |c|'s properties as follows:
+    
+        :   {{Credential/id}}
+        ::  |init|.{{CredentialData/id}}'s value
+        :   {{FederatedCredential/provider}}
+        ::  |init|.{{FederatedCredentialInit/provider}}'s value
+        :   {{CredentialUserData/iconURL}}
+        ::  |init|.{{CredentialUserData/iconURL}}'s value
+        :   {{CredentialUserData/name}}
+        ::  |init|.{{CredentialUserData/name}}'s value
+        :   {{Credential/[[origin]]}}
+        ::  |init|.{{FederatedCredentialInit/origin}}'s value.
+
+    4.  Return |c|.
+  </ol>
+
+</section>
